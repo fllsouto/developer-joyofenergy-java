@@ -35,10 +35,14 @@ public class MeterReadingController {
     }
 
     private boolean isMeterReadingsValid(MeterReadings meterReadings) {
-        String smartMeterId = meterReadings.smartMeterId();
-        List<ElectricityReading> electricityReadings = meterReadings.electricityReadings();
-        return smartMeterId != null && !smartMeterId.isEmpty()
-                && electricityReadings != null && !electricityReadings.isEmpty();
+        Optional<String> smartMeterId = Optional.ofNullable(meterReadings.smartMeterId());
+        Optional<List<ElectricityReading>> electricityReadings = Optional.ofNullable(meterReadings.electricityReadings());
+
+        if (!smartMeterId.isPresent() || !electricityReadings.isPresent()) return false;
+        if (smartMeterId.get().isEmpty() || electricityReadings.get().isEmpty()) return false;
+
+        return true;
+
     }
 
     @GetMapping("/read/{smartMeterId}")
