@@ -3,6 +3,9 @@ package uk.tw.energy.controller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+
+import uk.tw.energy.controller.dto.PricePlanCostOutput;
+import uk.tw.energy.controller.dto.RecommendPricePlansOutput;
 import uk.tw.energy.domain.ElectricityReading;
 import uk.tw.energy.domain.PricePlan;
 import uk.tw.energy.service.AccountService;
@@ -17,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -59,31 +63,39 @@ public class PricePlanComparatorControllerTest {
         expectedPricePlanToCost.put(PRICE_PLAN_2_ID, BigDecimal.valueOf(10.0));
         expectedPricePlanToCost.put(PRICE_PLAN_3_ID, BigDecimal.valueOf(20.0));
 
-        Map<String, Object> expected = new HashMap<>();
-        expected.put(PricePlanComparatorController.PRICE_PLAN_ID_KEY, PRICE_PLAN_1_ID);
-        expected.put(PricePlanComparatorController.PRICE_PLAN_COMPARISONS_KEY, expectedPricePlanToCost);
-        assertThat(controller.calculatedCostForEachPricePlan(SMART_METER_ID).getBody()).isEqualTo(expected);
+        Map<String, BigDecimal> plansCost = new HashMap<>();
+        plansCost.put(PRICE_PLAN_1_ID, BigDecimal.valueOf(100.0));
+        plansCost.put(PRICE_PLAN_2_ID, BigDecimal.valueOf(10.0));
+        plansCost.put(PRICE_PLAN_3_ID, BigDecimal.valueOf(20.0));
+
+        var expectedOutput = new PricePlanCostOutput(PRICE_PLAN_1_ID, expectedPricePlanToCost);
+
+        assertThat(controller.calculatedCostForEachPricePlan(SMART_METER_ID).getBody()).isEqualTo(expectedOutput);
     }
 
     @Test
     public void shouldRecommendCheapestPricePlansNoLimitForMeterUsage() throws Exception {
 
+        Optional<Integer> limit = Optional.empty();
         ElectricityReading electricityReading = new ElectricityReading(Instant.now().minusSeconds(1800), BigDecimal.valueOf(35.0));
         ElectricityReading otherReading = new ElectricityReading(Instant.now(), BigDecimal.valueOf(3.0));
         meterReadingService.storeReadings(SMART_METER_ID, Arrays.asList(electricityReading, otherReading));
 
-        List<Map.Entry<String, BigDecimal>> expectedPricePlanToCost = new ArrayList<>();
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_2_ID, BigDecimal.valueOf(38.0)));
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_3_ID, BigDecimal.valueOf(76.0)));
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_1_ID, BigDecimal.valueOf(380.0)));
+        Map<String, BigDecimal> plansCost = new HashMap<>();
+        plansCost.put(PRICE_PLAN_2_ID, BigDecimal.valueOf(38.0));
+        plansCost.put(PRICE_PLAN_3_ID, BigDecimal.valueOf(76.0));
+        plansCost.put(PRICE_PLAN_1_ID, BigDecimal.valueOf(380.0));
 
-        assertThat(controller.recommendCheapestPricePlans(SMART_METER_ID, null).getBody()).isEqualTo(expectedPricePlanToCost);
+        var expectedOutput = new RecommendPricePlansOutput(plansCost, limit);
+
+        assertThat(controller.recommendCheapestPricePlans(SMART_METER_ID, limit).getBody()).isEqualTo(expectedOutput);
     }
 
 
     @Test
     public void shouldRecommendLimitedCheapestPricePlansForMeterUsage() throws Exception {
 
+        Optional<Integer> limit = Optional.of(2);
         ElectricityReading electricityReading = new ElectricityReading(Instant.now().minusSeconds(2700), BigDecimal.valueOf(5.0));
         ElectricityReading otherReading = new ElectricityReading(Instant.now(), BigDecimal.valueOf(20.0));
         meterReadingService.storeReadings(SMART_METER_ID, Arrays.asList(electricityReading, otherReading));
@@ -92,22 +104,33 @@ public class PricePlanComparatorControllerTest {
         expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_2_ID, BigDecimal.valueOf(16.7)));
         expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_3_ID, BigDecimal.valueOf(33.4)));
 
-        assertThat(controller.recommendCheapestPricePlans(SMART_METER_ID, 2).getBody()).isEqualTo(expectedPricePlanToCost);
+        Map<String, BigDecimal> plansCost = new HashMap<>();
+        plansCost.put(PRICE_PLAN_2_ID, BigDecimal.valueOf(16.7));
+        plansCost.put(PRICE_PLAN_3_ID, BigDecimal.valueOf(33.4));
+
+        var expectedOutput = new RecommendPricePlansOutput(plansCost, limit);
+        var responseOutput = controller.recommendCheapestPricePlans(SMART_METER_ID, limit).getBody();
+        System.out.println(expectedOutput);
+
+        assertThat(responseOutput).isEqualTo(expectedOutput);
     }
 
     @Test
     public void shouldRecommendCheapestPricePlansMoreThanLimitAvailableForMeterUsage() throws Exception {
 
+        Optional<Integer> limit = Optional.of(5);
         ElectricityReading electricityReading = new ElectricityReading(Instant.now().minusSeconds(3600), BigDecimal.valueOf(25.0));
         ElectricityReading otherReading = new ElectricityReading(Instant.now(), BigDecimal.valueOf(3.0));
         meterReadingService.storeReadings(SMART_METER_ID, Arrays.asList(electricityReading, otherReading));
 
-        List<Map.Entry<String, BigDecimal>> expectedPricePlanToCost = new ArrayList<>();
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_2_ID, BigDecimal.valueOf(14.0)));
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_3_ID, BigDecimal.valueOf(28.0)));
-        expectedPricePlanToCost.add(new AbstractMap.SimpleEntry<>(PRICE_PLAN_1_ID, BigDecimal.valueOf(140.0)));
+        Map<String, BigDecimal> plansCost = new HashMap<>();
+        plansCost.put(PRICE_PLAN_2_ID, BigDecimal.valueOf(14.0));
+        plansCost.put(PRICE_PLAN_3_ID, BigDecimal.valueOf(28.0));
+        plansCost.put(PRICE_PLAN_1_ID, BigDecimal.valueOf(140.0));
 
-        assertThat(controller.recommendCheapestPricePlans(SMART_METER_ID, 5).getBody()).isEqualTo(expectedPricePlanToCost);
+        var expectedOutput = new RecommendPricePlansOutput(plansCost, limit);
+
+        assertThat(controller.recommendCheapestPricePlans(SMART_METER_ID, limit).getBody()).isEqualTo(expectedOutput);
     }
 
     @Test
